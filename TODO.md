@@ -76,3 +76,4 @@
 
 - Air quality (`elements=add:aqius`), at a possible extra cost: to check.
 - The language of the alert texts (`lang`), if Visual Crossing translates them.
+- [ ] r2 mineurs : tests de la coupe des copies (30 h, 9 jours ; N7, N8), message 5xx + Retry-After (N14), docs/fr.md:111-112 : mots-clés d'alerte lus en anglais seulement (ne pas les traduire).
