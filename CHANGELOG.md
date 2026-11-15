@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-15
+
 ### Added
 
 - Visual Crossing as the weather provider of Gladys: current conditions, 24
@@ -24,4 +26,5 @@ the notes of the version's GitHub Release.
 - A key refused (HTTP 401) is no longer sent; "Test Visual Crossing" checks
   it and lifts the refusal.
 
-[Unreleased]: https://github.com/LM1LC3N7/gladys-visual-crossing/commits/main
+[Unreleased]: https://github.com/LM1LC3N7/gladys-visual-crossing/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/LM1LC3N7/gladys-visual-crossing/releases/tag/v0.1.1
