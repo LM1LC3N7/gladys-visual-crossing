@@ -65,6 +65,11 @@ export const MAX_CACHE_ENTRIES = 8;
 export const MAX_HOURS = 24;
 export const MAX_DAYS = 8;
 export const MAX_ALERTS = 10;
+// What a copy keeps: 24 hours + the 4 h of the stale limit + margin; 9 days.
+export const KEEP_HOURS = 30;
+export const KEEP_DAYS = 9;
+// /data/state.json is written under this (it is read back up to 2 MB).
+export const MAX_STATE_CHARS = 1_500_000;
 
 // The test button asks the current conditions here (Greenwich observatory:
 // no personal data, no `location` permission needed).

@@ -19,6 +19,8 @@ the notes of the version's GitHub Release.
   by default), one call at a time, a daily cap of records counted before each
   call, no retry of a call that may have been billed, pauses after 429 and
   errors, all kept in `/data` across restarts.
+- A Retry-After on a 5xx is followed (60 s - 1 h); the doubling step of the
+  pauses survives a restart.
 - A key refused (HTTP 401) is no longer sent; "Test Visual Crossing" checks
   it and lifts the refusal.
 

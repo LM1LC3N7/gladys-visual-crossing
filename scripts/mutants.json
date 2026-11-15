@@ -156,12 +156,6 @@
     "to": "if (kept)"
   },
   {
-    "name": "deadline: no call without time",
-    "file": "src/app.js",
-    "from": "timeout: Math.min(HTTP_TIMEOUT, Math.max(1, deadline - this.monotonic())),",
-    "to": "timeout: 30_000,"
-  },
-  {
     "name": "test button: spacing",
     "file": "src/app.js",
     "from": "if (since < TEST_SPACING) return",
@@ -220,5 +214,113 @@
     "file": "src/conditions.js",
     "from": ".replace(/red flag/g, 'fire weather')",
     "to": ""
+  },
+  {
+    "name": "deadline: HTTP timeout follows the deadline",
+    "file": "src/app.js",
+    "from": "Math.floor(Math.min(HTTP_TIMEOUT, deadline - this.monotonic()))",
+    "to": "Math.floor(HTTP_TIMEOUT)"
+  },
+  {
+    "name": "deadline: checked again after the count",
+    "file": "src/app.js",
+    "from": "      if (deadline - this.monotonic() < MIN_CALL_TIME) throw notSent(T.noTime);\n",
+    "to": "\n"
+  },
+  {
+    "name": "not sent: the record taken back",
+    "file": "src/app.js",
+    "from": "        this.state.records = Math.max(0, this.state.records - 1);\n",
+    "to": "\n"
+  },
+  {
+    "name": "local error: no pause",
+    "file": "src/app.js",
+    "from": "        if (!(err instanceof NetworkError)) {",
+    "to": "        if (false) {"
+  },
+  {
+    "name": "hold: kept after a network failure",
+    "file": "src/app.js",
+    "from": "        const reason = err.message;\n",
+    "to": "        const reason = err.message;\n        if (holdKey) this.holds.delete(holdKey);\n"
+  },
+  {
+    "name": "hold: kept after a 429",
+    "file": "src/app.js",
+    "from": "        this.setPause('429', ms, 'HTTP 429');",
+    "to": "        this.setPause('429', ms, 'HTTP 429');\n        if (holdKey) this.holds.delete(holdKey);"
+  },
+  {
+    "name": "hold: kept after an unreadable 200",
+    "file": "src/app.js",
+    "from": "      this.setHold(key, 'fail', FAIL_HOLD);\n      this.setPause(",
+    "to": "      this.holds.delete(key);\n      this.setPause("
+  },
+  {
+    "name": "pause: 60 s floor",
+    "file": "src/app.js",
+    "from": "Math.min(Math.max(ms, PAUSE_MIN), max)",
+    "to": "Math.min(ms, max)"
+  },
+  {
+    "name": "cap: a cost of 0 never lowers",
+    "file": "src/app.js",
+    "from": "if (cost > 1) {",
+    "to": "if (cost !== 1) {"
+  },
+  {
+    "name": "stop: cancels the getConfig retry",
+    "file": "src/app.js",
+    "from": "    this.connGen += 1;\n    this.cancelConfigRetry();\n    if (this.stateTimer)",
+    "to": "    if (this.stateTimer)"
+  },
+  {
+    "name": "cap: a far day filed under today",
+    "file": "src/app.js",
+    "from": "} else if (this.state.day > dayKey(wall + 86_400_000)) {",
+    "to": "} else if (false) {"
+  },
+  {
+    "name": "status: published after a re-read of /data",
+    "file": "src/app.js",
+    "from": "        this.lastStatus = null;\n        this.publishStatus();\n        for (const resolve",
+    "to": "        for (const resolve"
+  },
+  {
+    "name": "5xx: Retry-After followed",
+    "file": "src/app.js",
+    "from": "this.setPause('error', asked ?? step, reason);",
+    "to": "this.setPause('error', step, reason);"
+  },
+  {
+    "name": "step: survives a restart",
+    "file": "src/app.js",
+    "from": "this.backoff = Math.min(Math.max(step, 0), PAUSE_MAX_429);",
+    "to": "this.backoff = 0;"
+  },
+  {
+    "name": "step: reset by a success",
+    "file": "src/app.js",
+    "from": "        this.backoff = 0;\n        this.pause = null;",
+    "to": "        this.pause = null;"
+  },
+  {
+    "name": "size: copies trimmed",
+    "file": "src/app.js",
+    "from": "      .slice(0, KEEP_HOURS);",
+    "to": ";"
+  },
+  {
+    "name": "alerts: watch before extreme",
+    "file": "src/conditions.js",
+    "from": "  ['moderate', /\\bwatch\\b|",
+    "to": "  ['moderate', /"
+  },
+  {
+    "name": "alerts: the 10 most severe kept",
+    "file": "src/pivot.js",
+    "from": "    .slice(0, MAX_ALERTS);\n  return {",
+    "to": "    ;\n  return {"
   }
 ]

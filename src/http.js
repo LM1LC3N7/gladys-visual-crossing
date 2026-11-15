@@ -52,7 +52,7 @@ async function readCapped(response, limit) {
  * complete answer arrived. Neither the URL nor the key appear in the error.
  */
 export async function get(url, { timeout = HTTP_TIMEOUT, limit = MAX_BODY_BYTES } = {}) {
-  const signal = AbortSignal.timeout(Math.max(1, timeout));
+  const signal = AbortSignal.timeout(Math.max(1, Math.floor(timeout)));
   let response;
   try {
     response = await fetchImpl(url, {

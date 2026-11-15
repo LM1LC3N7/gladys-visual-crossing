@@ -63,6 +63,13 @@ const status = async (gladys) => {
   return gladys.fake.connectionStatus;
 };
 const statuses = (gladys) => gladys.fake.connectionStatuses;
+// A clock whose monotonic time can be pushed forward (time spent in a call).
+const shiftable = (clock) => {
+  const c = { ...clock, extra: 0 };
+  c.monotonic = () => clock.monotonic() + c.extra;
+  return c;
+};
+const OTHER = { ...REQUEST, latitude: 45.764, longitude: 4.8357 };
 const noSecret = (text) => assert.ok(!text.includes(API_KEY), 'the key leaked');
 
 test('not configured: nothing sent, the status says what to enter', async () => {
@@ -145,6 +152,9 @@ test('the weather: one forecast call, metric conversions, alerts typed, copy reu
   assert.equal(fs.state().records, 1);
   assert.equal(fs.state().day, '2026-11-15');
   assert.deepEqual(fs.state().holds, []); // the hold of the call is lifted by its success
+  // only what can still be served is kept in /data
+  assert.ok(fs.state().cache[0].snapshot.hours.length <= 30);
+  assert.ok(fs.state().cache[0].snapshot.days.length <= 9);
 
   // Within the refresh interval: the copy, no call.
   await clock.advance(59 * MIN);
@@ -648,6 +658,9 @@ test('/data unreadable is not empty: nothing sent, read again every 10 s', async
   fs.broken = false;
   await clock.advance(1_500);
   assert.equal(fs.reads, reads + 1);
+  // read again: the status says so at once, without waiting for a call
+  assert.equal((await status(gladys)).connected, true);
+  assert.equal(fake.calls.length, 0);
   assert.equal((await gladys.fake.weatherGet(REQUEST)).success, true);
   assert.equal(fs.state().salt, SALT);
 });
@@ -717,4 +730,210 @@ test('stop leaves no timer and no call', async () => {
   await app.stop();
   assert.equal(clock.pending.size, 0);
   assert.equal(fake.calls.length, 0);
+});
+
+test('a slow answer for one location: the next one still leaves (whole-ms timeout), no pause', async () => {
+  const clock = shiftable(testClock({ start: START }));
+  const { gladys, fs } = await setup({ clock });
+  let n = 0;
+  fake.restore();
+  fake = installFetch(() => {
+    // the first call takes 3.2005 s: the second waits for it in the queue
+    if (n++ === 0) clock.extra += 3_200.5;
+    return json(weatherBody());
+  });
+  const acks = await Promise.all([gladys.fake.weatherGet(REQUEST), gladys.fake.weatherGet(OTHER)]);
+  assert.deepEqual(
+    acks.map((a) => a.success),
+    [true, true],
+  );
+  assert.equal(fake.calls.length, 2);
+  assert.equal(fs.state().records, 2);
+  assert.equal(fs.state().pause, null);
+});
+
+test('a local error before the request: no record, no hold, no pause', async () => {
+  const { app, fs, clock } = await setup();
+  await clock.settle();
+  const err = await app
+    .call(
+      () => {
+        throw new RangeError('bad timeout');
+      },
+      app.config,
+      app.gen,
+      { holdKey: 'a'.repeat(64), deadline: clock.monotonic() + 13_000 },
+    )
+    .catch((e) => e);
+  assert.match(err.message, /could not be prepared: nothing sent/);
+  await clock.settle();
+  assert.equal(fake.calls.length, 0);
+  assert.equal(fs.state().records, 0);
+  assert.deepEqual(fs.state().holds, []);
+  assert.equal(fs.state().pause, null);
+});
+
+test('the deadline is checked again after the count is written: too late, nothing sent', async () => {
+  const clock = shiftable(testClock({ start: START }));
+  const fs = memoryFs();
+  const { gladys } = await setup({ clock, fs });
+  const write = fs.writeFile;
+  let bumped = false;
+  fs.writeFile = async (...args) => {
+    if (!bumped && args[1].includes('"records":1')) {
+      bumped = true;
+      clock.extra += 11_500; // the write took 11.5 s of the 13
+    }
+    return write(...args);
+  };
+  const ack = await gladys.fake.weatherGet(REQUEST);
+  assert.equal(ack.success, false);
+  assert.match(ack.error ?? '', /nothing sent/);
+  assert.equal(fake.calls.length, 0);
+  await clock.settle();
+  assert.equal(fs.state().records, 0);
+});
+
+test('the HTTP timeout follows the 13 s of the request, not only its own 10 s', async (t) => {
+  const keep = setInterval(() => {}, 1000);
+  t.after(() => clearInterval(keep));
+  const clock = shiftable(testClock({ start: START }));
+  const fs = memoryFs();
+  const { app } = await setup({ clock, fs, handler: () => new Promise(() => {}) });
+  const write = fs.writeFile;
+  let bumped = false;
+  fs.writeFile = async (...args) => {
+    if (!bumped) {
+      bumped = true;
+      clock.extra += 10_500; // 2.5 s left
+    }
+    return write(...args);
+  };
+  const started = Date.now();
+  const outcome = await app.getWeather(REQUEST).then(
+    () => 'ok',
+    (e) => e.message,
+  );
+  const took = Date.now() - started;
+  assert.match(outcome, /timeout/);
+  assert.ok(took >= 2_000 && took < 5_000, `${took} ms`);
+});
+
+test('a Retry-After of 0 still pauses 60 s (never a storm)', async () => {
+  const { gladys, clock } = await setup({
+    handler: () => json({}, { status: 429, headers: { 'retry-after': '0' } }),
+  });
+  await gladys.fake.weatherGet(REQUEST);
+  await clock.advance(30_000);
+  await gladys.fake.weatherGet(OTHER);
+  assert.equal(fake.calls.length, 1);
+  await clock.advance(31_000);
+  await gladys.fake.weatherGet(OTHER);
+  assert.equal(fake.calls.length, 2);
+});
+
+test('a queryCost of 0 never lowers the count', async () => {
+  const { gladys, fs } = await setup({
+    handler: () => json(weatherBody(undefined, { top: { queryCost: 0 } })),
+  });
+  assert.equal((await gladys.fake.weatherGet(REQUEST)).success, true);
+  assert.equal(fs.state().records, 1);
+});
+
+for (const [name, handler] of [
+  ['a network failure', () => Promise.reject(new TypeError('fetch failed'))],
+  ['a 429', () => json({}, { status: 429, headers: { 'retry-after': '60' } })],
+  ['an unreadable 200', () => json('<html>busy</html>')],
+]) {
+  test(`after ${name}, this location waits 15 min although the pause ends sooner`, async () => {
+    const { gladys, clock, state } = await setup({ handler });
+    assert.equal((await gladys.fake.weatherGet(REQUEST)).success, false);
+    state.handler = () => json(weatherBody());
+    await clock.advance(61_000);
+    await gladys.fake.weatherGet(REQUEST);
+    assert.equal(fake.calls.length, 1);
+    assert.equal((await gladys.fake.weatherGet(OTHER)).success, true);
+    assert.equal(fake.calls.length, 2);
+    await clock.advance(14 * MIN);
+    assert.equal((await gladys.fake.weatherGet(REQUEST)).success, true);
+    assert.equal(fake.calls.length, 3);
+  });
+}
+
+test('stop cancels the getConfig retry: no timer, no new read', async () => {
+  const clock = testClock({ start: START });
+  const { app, gladys } = await setup({ clock, autoStart: false });
+  let reads = 0;
+  gladys.getConfig = async () => {
+    reads += 1;
+    throw new Error('host down');
+  };
+  await app.onConnected();
+  assert.equal(reads, 1);
+  await app.stop();
+  assert.equal(clock.pending.size, 0);
+  await clock.advance(10 * MIN);
+  assert.equal(reads, 1);
+});
+
+test('a clock that jumps forward then back never freezes the daily cap', async () => {
+  const clock = testClock({ start: START });
+  const { gladys, fs } = await setup({ clock, config: { ...CONFIG, daily_budget: 10 } });
+  clock.jumpWall(40 * 86_400_000);
+  assert.equal((await gladys.fake.weatherGet(REQUEST)).success, true);
+  assert.equal(fs.state().day, '2026-12-25');
+  clock.jumpWall(-40 * 86_400_000);
+  assert.equal((await gladys.fake.weatherGet(OTHER)).success, true);
+  await clock.settle();
+  assert.equal(fs.state().day, '2026-11-15');
+  assert.equal(fs.state().records, 2); // kept, on the safe side
+});
+
+test('a count filed under a far day in /data: blocked today only, reset at midnight UTC', async () => {
+  const clock = testClock({ start: START });
+  const { gladys } = await setup({
+    clock,
+    config: { ...CONFIG, daily_budget: 10 },
+    initial: { salt: SALT, day: '2026-12-25', records: 10 },
+  });
+  assert.equal((await gladys.fake.weatherGet(REQUEST)).success, false);
+  assert.match((await status(gladys)).message.en, /before midnight UTC/);
+  clock.jumpWall(14 * 3600_000);
+  assert.equal((await gladys.fake.weatherGet(REQUEST)).success, true);
+});
+
+test('5xx: Retry-After followed, within 60 s - 1 h', async () => {
+  const { gladys, clock, fs, state } = await setup({
+    handler: () => json('busy', { status: 503, headers: { 'retry-after': '1800' } }),
+  });
+  await gladys.fake.weatherGet(REQUEST);
+  await clock.advance(29 * MIN);
+  await gladys.fake.weatherGet(OTHER);
+  assert.equal(fake.calls.length, 1);
+  await clock.advance(2 * MIN);
+  state.handler = () => json('busy', { status: 503, headers: { 'retry-after': '99999' } });
+  await gladys.fake.weatherGet(OTHER);
+  assert.equal(fake.calls.length, 2);
+  const left = fs.state().pause.untilWall - clock.now();
+  assert.ok(left <= 3600_000 && left > 3600_000 - 1000, String(left));
+});
+
+test('the doubling step survives a restart after its pause; a success resets it', async () => {
+  const clock = testClock({ start: START });
+  const { gladys, fs } = await setup({ clock, handler: () => json('x', { status: 503 }) });
+  await gladys.fake.weatherGet(REQUEST);
+  await clock.advance(61_000);
+  await gladys.fake.weatherGet(OTHER); // 2 min
+  await clock.advance(3 * MIN);
+  const again = await setup({ fs, clock, handler: () => json('x', { status: 503 }) });
+  await again.gladys.fake.weatherGet({ ...REQUEST, latitude: 1, longitude: 1 });
+  assert.match((await status(again.gladys)).message.en, /HTTP 503.*4 min/);
+  again.state.handler = () => json(weatherBody());
+  await clock.advance(5 * MIN);
+  assert.equal(
+    (await again.gladys.fake.weatherGet({ ...REQUEST, latitude: 2, longitude: 2 })).success,
+    true,
+  );
+  await clock.settle();
+  assert.equal(fs.state().step, 0);
 });

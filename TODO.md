@@ -57,6 +57,21 @@
       configuration screen say "Weather data provided by Visual Crossing").
 - [ ] The UTC day matches the reset of the free 1,000 records.
 
+## From review r1 (low stakes, left for later)
+
+- A hold read from `/data` up to 3 h is accepted (HOLD_MAX = the longest
+  refresh); could be bounded by its kind (15 min for a failure).
+- The lifting of a refusal by a new key is written without a test of the
+  write itself.
+- The end of an alert is judged on the server Date + the local monotonic time
+  since the answer; a copy restored from `/data` keeps the old server Date
+  (no alert ever called ended too early, some kept a little longer).
+- No test at the exact UTC midnight boundary of the day count.
+- The refusal mark is salted per installation but the salt sits in `/data`
+  beside it (one byte: 1 guess in 256 matches, by design).
+- A copy older than 4 h is never served on the normal path; during a hold the
+  same limit applies (one test only).
+
 ## Ideas
 
 - Air quality (`elements=add:aqius`), at a possible extra cost: to check.

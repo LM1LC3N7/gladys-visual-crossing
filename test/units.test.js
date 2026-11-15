@@ -206,3 +206,35 @@ test('urls: coordinates rounded, metric, never a date range; Retry-After', () =>
   assert.equal(retryAfterMs('Sun, 15 Nov 2026 03:05:00 GMT'), undefined);
   assert.equal(retryAfterMs('soon'), undefined);
 });
+
+test('alert levels and types on real titles (NWS, MeteoAlarm, Météo-France)', () => {
+  const cases = [
+    ['Extreme Cold Watch', 'moderate', 'cold'],
+    ['Extreme Heat Watch', 'moderate', 'heat'],
+    ['Extreme Heat Warning', 'extreme', 'heat'],
+    ['Tornado Warning', 'extreme', 'wind'],
+    ['Hurricane Warning', 'extreme', 'wind'],
+    ['Hurricane Watch', 'moderate', 'wind'],
+    ['Freezing Fog Advisory', 'minor', 'fog'],
+    ['Dense Fog Advisory', 'minor', 'fog'],
+    ['Severe Thunderstorm Warning', 'severe', 'thunderstorm'],
+    ['Moderate thunderstorm warning', 'moderate', 'thunderstorm'],
+    ['Vigilance orange vent violent', 'severe', 'wind'],
+    ['Special event notice', 'minor', undefined],
+  ];
+  for (const [title, severity, type] of cases) {
+    assert.equal(toSeverity(title), severity, title);
+    assert.equal(toAlertType(title), type, title);
+  }
+});
+
+test('parse: the 10 most severe alerts are kept', () => {
+  const body = weatherBody();
+  body.alerts = [
+    ...Array.from({ length: 12 }, (_, i) => ({ event: `Notice ${i}`, id: `n${i}` })),
+    { event: 'Red flood warning', id: 'r' },
+  ];
+  const s = parseWeather(JSON.stringify(body));
+  assert.equal(s.alerts.length, 10);
+  assert.equal(s.alerts[0].title, 'Red flood warning');
+});

@@ -19,6 +19,9 @@ import {
   FAIL_HOLD,
   HOLD_MAX,
   HTTP_TIMEOUT,
+  KEEP_DAYS,
+  KEEP_HOURS,
+  MAX_STATE_CHARS,
   MAX_CACHE_ENTRIES,
   MIN_CALL_TIME,
   PAUSE_MAX_429,
@@ -203,6 +206,8 @@ export class VisualCrossingApp {
       if (outcome !== 'timeout' && !outcome.err) {
         this.applyState(outcome.raw);
         this.stateBroken = false;
+        this.lastStatus = null;
+        this.publishStatus();
         for (const resolve of this.stateWaiters.splice(0)) resolve();
         return;
       }
@@ -271,9 +276,12 @@ export class VisualCrossingApp {
           untilMono: mono + left,
           untilWall: p.untilWall,
         };
-        this.backoff = Number.isFinite(p.step) ? Math.min(Math.max(p.step, 0), max) : 0;
       }
     }
+    // The doubling step survives a restart even when the pause has ended
+    // (reset by a success only).
+    const step = Number.isFinite(raw.step) ? raw.step : Number.isFinite(p?.step) ? p.step : 0;
+    this.backoff = Math.min(Math.max(step, 0), PAUSE_MAX_429);
     // The holds of the locations whose last call failed (or was attempted
     // when the process stopped): never asked again sooner after a restart.
     for (const h of Array.isArray(raw.holds) ? raw.holds.slice(0, MAX_CACHE_ENTRIES) : []) {
@@ -331,6 +339,7 @@ export class VisualCrossingApp {
       day: this.state.day,
       records: this.state.records,
       refused: this.state.refused ? { id: this.state.refused } : null,
+      step: this.backoff,
       pause: this.pause
         ? {
             kind: this.pause.kind,
@@ -350,6 +359,10 @@ export class VisualCrossingApp {
         snapshot: e.snapshot,
       })),
     };
+    // Under the size /data is read back at (the oldest copies go first).
+    while (value.cache.length > 0 && JSON.stringify(value).length > MAX_STATE_CHARS) {
+      value.cache.shift();
+    }
     try {
       await this.store.save(value);
       this.saveFailed = false;
@@ -408,11 +421,16 @@ export class VisualCrossingApp {
   }
 
   rollDay() {
-    const day = dayKey(this.now());
-    // Only forward: a wall clock set back never resets a later day's count.
+    const wall = this.now();
+    const day = dayKey(wall);
     if (this.state.day === null || day > this.state.day) {
       this.state.day = day;
       this.state.records = 0;
+    } else if (this.state.day > dayKey(wall + 86_400_000)) {
+      // A day further than tomorrow (the clock jumped forward, then came
+      // back): the count is kept, on the safe side, but filed under today, so
+      // it is reset at the next real midnight UTC (never weeks later).
+      this.state.day = day;
     }
   }
 
@@ -481,20 +499,33 @@ export class VisualCrossingApp {
       if (deadline - this.monotonic() < MIN_CALL_TIME) throw new TextError(T.noTime);
       this.state.records += 1;
       if (holdKey) this.setHold(holdKey, 'fail', FAIL_HOLD);
-      // Nothing leaves: the hold goes (the count stays, on the safe side).
+      // Nothing left: the record and the hold are taken back (written
+      // again; a slow write that lands later is overtaken by this one).
       const notSent = (text) => {
+        this.state.records = Math.max(0, this.state.records - 1);
         if (holdKey) this.holds.delete(holdKey);
+        this.persist();
         return new TextError(text);
       };
       if (!(await this.persistWithin(COUNT_SAVE_TIMEOUT))) throw notSent(T.notCounted);
+      // The write took time: the deadline is checked again before sending.
       if (deadline - this.monotonic() < MIN_CALL_TIME) throw notSent(T.noTime);
       let res;
       try {
-        res = await get(build(cfg.value.apiKey), {
-          timeout: Math.min(HTTP_TIMEOUT, Math.max(1, deadline - this.monotonic())),
-        });
+        // A whole number of milliseconds (AbortSignal.timeout refuses a fraction).
+        const timeout = Math.max(
+          1,
+          Math.floor(Math.min(HTTP_TIMEOUT, deadline - this.monotonic())),
+        );
+        res = await get(build(cfg.value.apiKey), { timeout });
       } catch (err) {
-        const reason = err instanceof NetworkError ? err.message : 'no answer';
+        if (!(err instanceof NetworkError)) {
+          // A local error before the request (it never reached fetch): no
+          // pause, no hold, no record.
+          this.logger.warn(`Request not sent: ${err?.name ?? 'error'}`);
+          throw notSent(T.localError);
+        }
+        const reason = err.message;
         this.setPause('error', this.nextBackoff(PAUSE_MAX_ERROR), reason);
         if (gen === this.gen) this.publishStatus();
         throw new TextError(T.pausedError(reason, this.backoff));
@@ -503,6 +534,7 @@ export class VisualCrossingApp {
         // The real cost of the call (1 for a forecast) on top of the 1
         // already counted.
         const cost = queryCost(res.text) ?? 1;
+        // Never below the 1 counted (a cost of 0 never lowers the count).
         if (cost > 1) {
           this.state.records += cost - 1;
           if (!this.costWarned) {
@@ -549,10 +581,13 @@ export class VisualCrossingApp {
         throw new TextError(T.notServed(reason));
       }
       // 403 (a proxy or a firewall in front of the API), 5xx, others: a
-      // pause, never a refusal of the key.
-      this.setPause('error', this.nextBackoff(PAUSE_MAX_ERROR), reason);
+      // pause, never a refusal of the key; a Retry-After is followed (the
+      // pause stays within 60 s - 1 h).
+      const asked = retryAfterMs(res.retryAfter, res.date);
+      const step = this.nextBackoff(PAUSE_MAX_ERROR);
+      this.setPause('error', asked ?? step, reason);
       if (gen === this.gen) this.publishStatus();
-      throw new TextError(T.pausedError(reason, this.backoff));
+      throw new TextError(T.pausedError(reason, this.pause.untilMono - this.monotonic()));
     });
   }
 
@@ -632,6 +667,13 @@ export class VisualCrossingApp {
       if (gen === this.gen) this.publishStatus();
       throw new TextError(T.pausedError(err.message, this.backoff));
     }
+    // Only what can still be served is kept (memory and /data stay small):
+    // the hours of the next day and of the stale limit, 9 days.
+    const nowMs = this.now();
+    snapshot.hours = snapshot.hours
+      .filter((h) => Date.parse(h.start) + 3600_000 > nowMs)
+      .slice(0, KEEP_HOURS);
+    snapshot.days = snapshot.days.filter((d) => d.endMs > nowMs).slice(0, KEEP_DAYS);
     const serverDateMs = Date.parse(res.date ?? '');
     const entry = {
       snapshot,

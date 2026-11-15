@@ -43,20 +43,25 @@ après une 401, la clé n'est plus utilisée. Avec la lecture par défaut toutes
 
 **Tester Visual Crossing** fait un appel (les conditions actuelles à Greenwich, 1 enregistrement, aucune donnée
 personnelle) : il indique si la clé est acceptée et les enregistrements comptés aujourd'hui. Il fonctionne au plus
-une fois par minute, ni pendant une pause demandée par Visual Crossing, ni une fois le plafond atteint.
+une fois par minute, ni pendant une pause (après une 429, une erreur ou un délai dépassé), ni une fois le plafond atteint.
 
 ## Rythme, pauses et erreurs
 
 - Gladys demande la météo quand un tableau de bord l'affiche, quand l'assistant répond, et toutes les 30 minutes
-  pour les alertes. L'intégration répond avec sa copie tant qu'elle est plus récente que l'intervalle.
+  pour les alertes quand une scène utilise le déclencheur d'alerte météo. L'intégration répond avec sa copie tant qu'elle est plus récente que l'intervalle.
 - Un seul appel à la fois vers Visual Crossing, quel que soit le nombre de lieux.
 - **HTTP 429** : pause aussi longue que le dit `Retry-After` (comparé à l'en-tête `Date` du serveur), entre 60 s
   et 6 heures ; sans l'en-tête, 60 s puis doublée jusqu'à 6 heures.
 - **Délai dépassé (10 s), erreur réseau, erreur serveur, 403, réponse illisible ou trop grosse (plus de 1 Mo)** :
-  pause de 60 s pour tous les lieux, doublée à chaque échec jusqu'à 1 heure, et **ce lieu** n'est pas redemandé
+  pause de 60 s pour tous les lieux (ou le `Retry-After` de la réponse, de 60 s à 1 heure), doublée à chaque échec
+  jusqu'à 1 heure (le palier survit à un redémarrage et revient à zéro après un succès), et **ce lieu** n'est pas redemandé
   avant 15 minutes (l'appel en échec a pu être facturé).
 - **HTTP 400 ou 404** : le lieu n'est pas servi ; seul ce lieu est retenu pendant un intervalle de lecture.
 - Gladys attend 15 s une réponse : un appel qui ne peut pas finir à temps ne part pas.
+- Une horloge qui saute en avant puis revient ne fige jamais le plafond : un compte rangé sous un jour au-delà de
+  demain est gardé, par prudence, mais rangé sous aujourd'hui et remis à zéro au prochain minuit UTC.
+- Une requête qui n'a même pas pu être préparée (erreur locale avant l'envoi) ne compte aucun enregistrement, ne
+  retient aucun lieu et ne met rien en pause.
 - Si le comptage d'un appel ne peut pas être écrit dans `/data` en 1 s, l'appel ne part pas (le plafond doit
   survivre à un redémarrage).
 - Pendant une pause ou une panne, Gladys reçoit la dernière copie si elle a moins de 4 heures, avec sa propre date
@@ -102,8 +107,9 @@ Unités : le métrique est converti en m/s (vent) et km, ou en °F, mph, pouces 
 hPa ; humidité, couverture nuageuse et probabilité de précipitation en pourcentage. Une valeur absente reste
 absente, jamais 0.
 
-Alertes : Visual Crossing ne donne pas de niveau. Il est lu dans le titre : rouge ou extrême → extreme ; jaune,
-modéré ou « watch » → moderate ; orange, sévère ou « warning » → severe ; sinon → minor (l'alerte est gardée). Le
+Alertes : Visual Crossing ne donne pas de niveau. Il est lu dans le titre : « watch », jaune ou modéré → moderate (même
+une « Extreme ... Watch ») ; rouge, extrême, urgence, avertissement de tornade ou d'ouragan → extreme ; orange,
+sévère ou « warning » → severe ; sinon → minor (l'alerte est gardée). Le
 phénomène (orage, vent, neige...) est lu dans le titre en anglais, français, allemand ou espagnol. Les alertes
 terminées selon l'horloge du serveur sont retirées.
 

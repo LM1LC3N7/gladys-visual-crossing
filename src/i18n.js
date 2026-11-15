@@ -59,6 +59,10 @@ export const T = {
     en: 'Not enough time left to ask Visual Crossing before Gladys gives up: nothing sent.',
     fr: "Plus assez de temps pour interroger Visual Crossing avant que Gladys n'abandonne : rien envoyé.",
   },
+  localError: {
+    en: 'The request to Visual Crossing could not be prepared: nothing sent, nothing counted.',
+    fr: "La requête à Visual Crossing n'a pas pu être préparée : rien envoyé, rien compté.",
+  },
   notCounted: {
     en: 'The call could not be counted in /data/state.json: nothing sent (the daily cap must survive a restart).',
     fr: "L'appel n'a pas pu être compté dans /data/state.json : rien envoyé (le plafond quotidien doit survivre à un redémarrage).",

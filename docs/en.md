@@ -41,20 +41,25 @@ longer used. With the default refresh of
 
 **Test Visual Crossing** makes one call (the current conditions at Greenwich, 1 record, no personal data): it says
 whether the key is accepted and the records counted today. It runs at most once a minute, and not during a pause
-asked by Visual Crossing nor once the daily cap is reached.
+(after a 429, an error or a timeout) nor once the daily cap is reached.
 
 ## Pacing, pauses and errors
 
 - Gladys asks for the weather when a dashboard shows it, when the assistant answers, and every 30 minutes for the
-  alerts. The integration answers from its kept copy while it is younger than the interval.
+  alerts when a scene uses the weather-alert trigger. The integration answers from its kept copy while it is younger than the interval.
 - One call at a time to Visual Crossing, whatever the number of locations.
 - **HTTP 429**: paused as long as `Retry-After` says (compared with the server's `Date` header), between 60 s and
   6 hours; without the header, 60 s then doubled up to 6 hours.
 - **Timeout (10 s), network error, server error, 403, unreadable or oversized (over 1 MB) answer**: a 60 s pause
-  for every location, doubled at each failure up to 1 hour, and **this location** is not asked again for
+  for every location (or the `Retry-After` of the answer, 60 s to 1 hour), doubled at each failure up to 1 hour
+  (the step survives a restart and is reset by a success), and **this location** is not asked again for
   15 minutes (the failed call may have been billed).
 - **HTTP 400 or 404**: the location is not served; only that location is held back for one refresh interval.
 - Gladys waits 15 s for an answer: a call that cannot end in time does not leave.
+- A clock that jumps forward then back never freezes the cap: a count filed under a day further than tomorrow is
+  kept, on the safe side, but filed under today and reset at the next midnight UTC.
+- A request that could not even be prepared (a local error before it leaves) counts no record, holds nothing and
+  pauses nothing.
 - If the count of a call cannot be written to `/data` within 1 s, the call does not leave (the cap must survive a
   restart).
 - During a pause or an outage, Gladys gets the last copy if it is under 4 hours old, with its own date (never
@@ -97,8 +102,9 @@ Day or night comes from the sunrise and sunset times, else from the icon (`-day`
 converted to m/s (wind) and km, or to °F, mph, inches and miles (US); pressure stays in hPa; humidity, cloud cover
 and precipitation chance in percent. A missing value stays missing, never 0.
 
-Alerts: Visual Crossing gives no level. It is read from the title: red or extreme → extreme; yellow, moderate or
-"watch" → moderate; orange, severe or "warning" → severe; anything else → minor (the alert is kept). The phenomenon
+Alerts: Visual Crossing gives no level. It is read from the title: a "watch", yellow or moderate → moderate (even
+an "Extreme ... Watch"); red, extreme, emergency, tornado or hurricane warning → extreme; orange, severe or
+"warning" → severe; anything else → minor (the alert is kept). The phenomenon
 (storm, wind, snow...) is read from the title in English, French, German or Spanish. Alerts ended by the server's
 clock are removed.
 

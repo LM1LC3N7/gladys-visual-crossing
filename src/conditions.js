@@ -57,10 +57,12 @@ export function iconDaylight(icon) {
 
 // Visual Crossing gives no alert level: it is read from the title (NWS
 // "Warning/Watch/Advisory", MeteoAlarm colours, en/fr/de/es). Order matters:
-// a "Yellow ... Warning" is moderate. No match: minor (never dropped).
+// a watch is moderate even when "Extreme" (NWS "Extreme Cold Watch"), a
+// "Yellow ... Warning" is moderate, a tornado or hurricane warning extreme.
+// No match: minor (never dropped).
 const SEVERITIES = [
-  ['extreme', /extreme|\bred\b|rouge|\brot\b|\brojo\b|emergency/],
-  ['moderate', /yellow|jaune|\bgelb|amarill|moderate|modérée|watch/],
+  ['moderate', /\bwatch\b|yellow|jaune|\bgelb|amarill|moderate|modérée/],
+  ['extreme', /extreme|\bred\b|rouge|\brot\b|\brojo\b|emergency|(tornado|hurricane).*warning/],
   ['severe', /orange|severe|warning|alerte|warnung|aviso/],
 ];
 export const SEVERITY_RANK = { extreme: 4, severe: 3, moderate: 2, minor: 1 };
@@ -81,10 +83,11 @@ const TYPES = [
   ['flood', /flood|inondation|crue|hochwasser|überflutung|inundaci/],
   ['coastal', /coastal|storm surge|high surf|rip current|submersion|vagues|sturmflut|costero/],
   ['cold', /wind chill|extreme cold|grand froid|kälte|frío/],
+  ['fog', /freezing fog|brouillard givrant/],
   ['snow', /snow|blizzard|ice storm|winter|freezing|neige|verglas|schnee|glätte|glatteis|nieve/],
   ['heat', /heat|canicule|chaleur|hitze|calor/],
   ['cold', /cold|frost|freeze|froid|gel\b/],
-  ['wind', /wind|gale|hurricane|tornado|cyclone|vent|sturm|orkan|viento/],
+  ['wind', /wind|gale|hurricane|tornado|cyclone|\bvents?\b|sturm|orkan|viento/],
   ['rain', /rain|pluie|regen|lluvia/],
   ['fog', /fog|brouillard|nebel|niebla/],
 ];

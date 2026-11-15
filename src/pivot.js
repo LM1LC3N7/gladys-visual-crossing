@@ -173,7 +173,10 @@ export function parseWeather(text) {
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
-    });
+    })
+    // The 10 most severe are kept (Gladys shows 10 at most).
+    .sort((a, b) => SEVERITY_RANK[toSeverity(b.title)] - SEVERITY_RANK[toSeverity(a.title)])
+    .slice(0, MAX_ALERTS);
   return {
     current,
     hours: hours.slice(0, 400),
