@@ -1,0 +1,224 @@
+[
+  {
+    "name": "refusal: only the refused key",
+    "file": "src/app.js",
+    "from": "this.state.refused && this.state.refused === this.keyMark(cfg)",
+    "to": "this.state.refused"
+  },
+  {
+    "name": "refusal: lifted by a success",
+    "file": "src/app.js",
+    "from": "if (this.state.refused === mark) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "refusal: a new key while running lifts it",
+    "file": "src/app.js",
+    "from": "this.config.value.keyId !== this.refusedId",
+    "to": "false"
+  },
+  {
+    "name": "refusal: 401 recorded",
+    "file": "src/app.js",
+    "from": "        this.state.refused = this.keyMark(cfg);\n",
+    "to": "\n"
+  },
+  {
+    "name": "refusal: 403 is not one",
+    "file": "src/app.js",
+    "from": "if (res.status === 401) {",
+    "to": "if (res.status === 401 || res.status === 403) {"
+  },
+  {
+    "name": "cap: reached at the limit",
+    "file": "src/app.js",
+    "from": "this.state.records + 1 > cfg.value.dailyBudget",
+    "to": "this.state.records > cfg.value.dailyBudget"
+  },
+  {
+    "name": "cap: counted before sending",
+    "file": "src/app.js",
+    "from": "      this.state.records += 1;\n",
+    "to": "\n"
+  },
+  {
+    "name": "cap: count on disk before sending",
+    "file": "src/app.js",
+    "from": "if (!(await this.persistWithin(COUNT_SAVE_TIMEOUT))) throw notSent(T.notCounted);",
+    "to": "this.persistWithin(COUNT_SAVE_TIMEOUT);"
+  },
+  {
+    "name": "cap: queryCost added",
+    "file": "src/app.js",
+    "from": "this.state.records += cost - 1;",
+    "to": "this.state.records += 0;"
+  },
+  {
+    "name": "cap: the day rolls over",
+    "file": "src/app.js",
+    "from": "if (this.state.day === null || day > this.state.day) {",
+    "to": "if (this.state.day === null) {"
+  },
+  {
+    "name": "cap: never reset by a clock set back",
+    "file": "src/app.js",
+    "from": "if (this.state.day === null || day > this.state.day) {",
+    "to": "if (this.state.day === null || day !== this.state.day) {"
+  },
+  {
+    "name": "cap: the count restored",
+    "file": "src/app.js",
+    "from": "records: Number.isInteger(raw.records) && raw.records >= 0 ? raw.records : 0,",
+    "to": "records: 0,"
+  },
+  {
+    "name": "hold: set before the call",
+    "file": "src/app.js",
+    "from": "      if (holdKey) this.setHold(holdKey, 'fail', FAIL_HOLD);\n",
+    "to": "\n"
+  },
+  {
+    "name": "hold: honoured",
+    "file": "src/app.js",
+    "from": "if (held !== undefined && mono < held.untilMono) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "hold: restored after a restart",
+    "file": "src/app.js",
+    "from": "      this.holds.set(h.key, { untilMono: mono + left, untilWall: h.untilWall, kind: h.kind });",
+    "to": ""
+  },
+  {
+    "name": "hold: lifted by a success",
+    "file": "src/app.js",
+    "from": "        if (holdKey) this.holds.delete(holdKey);\n        this.persist();\n        return { ...res, cost };",
+    "to": "        this.persist();\n        return { ...res, cost };"
+  },
+  {
+    "name": "hold: 400 for one interval",
+    "file": "src/app.js",
+    "from": "this.setHold(holdKey, '400', cfg.value.refreshMs);",
+    "to": "this.setHold(holdKey, '400', FAIL_HOLD);"
+  },
+  {
+    "name": "400: no global pause",
+    "file": "src/app.js",
+    "from": "if (res.status === 400 || res.status === 404) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "one call at a time",
+    "file": "src/app.js",
+    "from": "    const run = this.chain.then(fn, fn);",
+    "to": "    const run = Promise.resolve().then(fn);"
+  },
+  {
+    "name": "pacing: the copy within the interval",
+    "file": "src/app.js",
+    "from": "if (entry && mono - entry.fetchedMono < cfg.value.refreshMs) return this.answer(entry, units);",
+    "to": "if (false) return this.answer(entry, units);"
+  },
+  {
+    "name": "pacing: copies restored at restart",
+    "file": "src/app.js",
+    "from": "        age < 0 ||\n        age > STALE_LIMIT ||",
+    "to": "        age > STALE_LIMIT ||"
+  },
+  {
+    "name": "pause: honoured",
+    "file": "src/app.js",
+    "from": "const left = this.pause ? this.pause.untilMono - this.monotonic() : 0;",
+    "to": "const left = 0;"
+  },
+  {
+    "name": "pause: bounded from the future",
+    "file": "src/app.js",
+    "from": "if (left > 0 && left <= max) {",
+    "to": "if (left > 0) {"
+  },
+  {
+    "name": "pause: doubling",
+    "file": "src/app.js",
+    "from": "Math.min(this.backoff * 2, max)",
+    "to": "Math.min(this.backoff, max)"
+  },
+  {
+    "name": "pause: 429 bounded to 6 h",
+    "file": "src/app.js",
+    "from": "const duration = Math.min(Math.max(ms, PAUSE_MIN), max);",
+    "to": "const duration = Math.max(ms, PAUSE_MIN);"
+  },
+  {
+    "name": "stale: never beyond 4 h",
+    "file": "src/app.js",
+    "from": "if (kept && this.monotonic() - kept.fetchedMono <= STALE_LIMIT)",
+    "to": "if (kept)"
+  },
+  {
+    "name": "deadline: no call without time",
+    "file": "src/app.js",
+    "from": "timeout: Math.min(HTTP_TIMEOUT, Math.max(1, deadline - this.monotonic())),",
+    "to": "timeout: 30_000,"
+  },
+  {
+    "name": "test button: spacing",
+    "file": "src/app.js",
+    "from": "if (since < TEST_SPACING) return",
+    "to": "if (false) return"
+  },
+  {
+    "name": "state: unreadable is not empty",
+    "file": "src/store.js",
+    "from": "      if (err?.code === 'ENOENT') return {};\n      throw new UnreadableStateError(err?.code ?? 'read error');",
+    "to": "      return {};"
+  },
+  {
+    "name": "getConfig: retried",
+    "file": "src/app.js",
+    "from": "      this.configTimer = this.timers.setTimeout(() => {\n        this.configTimer = null;\n        this.onConnected();",
+    "to": "      this.configTimer = this.timers.setTimeout(() => {\n        this.configTimer = null;"
+  },
+  {
+    "name": "http: body cap",
+    "file": "src/http.js",
+    "from": "    if (size > limit) {",
+    "to": "    if (false) {"
+  },
+  {
+    "name": "http: no redirect",
+    "file": "src/http.js",
+    "from": "redirect: 'manual',",
+    "to": "redirect: 'follow',"
+  },
+  {
+    "name": "pivot: past hours dropped",
+    "file": "src/pivot.js",
+    "from": ".filter((h) => Date.parse(h.start) + 3600_000 > nowMs)",
+    "to": ".filter(() => true)"
+  },
+  {
+    "name": "pivot: ended alerts dropped",
+    "file": "src/pivot.js",
+    "from": "a.end && Date.parse(a.end) <= serverNowMs",
+    "to": "false"
+  },
+  {
+    "name": "pivot: percent bounded",
+    "file": "src/pivot.js",
+    "from": "v >= 0 && v <= 100 ?",
+    "to": "true ?"
+  },
+  {
+    "name": "pivot: km/h to m/s",
+    "file": "src/pivot.js",
+    "from": "round(kmh / 3.6)",
+    "to": "round(kmh)"
+  },
+  {
+    "name": "conditions: red flag is not red",
+    "file": "src/conditions.js",
+    "from": ".replace(/red flag/g, 'fire weather')",
+    "to": ""
+  }
+]

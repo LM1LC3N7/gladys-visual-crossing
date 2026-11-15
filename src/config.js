@@ -1,45 +1,69 @@
 // -----------------------------------------------------------------------------
-// Integration configuration.
-//
-// The configuration is filled in by the user in Gladys, from the `config_schema`
-// declared in `gladys-assistant-integration.json`. The SDK fetches it for you
-// (`gladys.getConfig()`) and notifies you of every change through
-// `gladys.onConfigUpdated()`.
-//
-// This module only provides defaults and normalizes the received object, so the
-// rest of the code never has to deal with `undefined`.
+// The configuration screen, normalized. An invalid field is named, its value
+// never repeated (the API key above all).
 // -----------------------------------------------------------------------------
 
-// Defaults: they MUST stay consistent with the `default` values declared in the
-// `config_schema` of the manifest.
-export const DEFAULT_CONFIG = {
-  latitude: 48.8566, // Paris
-  longitude: 2.3522,
-  unit: 'celsius', // 'celsius' | 'fahrenheit'
-  // Seconds between two reads of the polled sensors. Gladys polls at most once
-  // a minute: slower intervals are applied by skipping polls (see
-  // createPoller in src/devices/index.js).
-  poll_frequency: 300,
-  // Reserved key (NOT in config_schema): because the manifest declares both
-  // 'local' and 'cloud' in its `transports` field, Gladys shows a standard
-  // "Prefer the local connection" toggle and sends the user's choice here.
-  // Read-only for the integration; defaults to true.
-  GLADYS_PREFER_LOCAL: true,
-};
+import { createHash } from 'node:crypto';
+import {
+  BUDGET_DEFAULT,
+  BUDGET_MAX,
+  BUDGET_MIN,
+  REFRESH_DEFAULT_MIN,
+  REFRESH_MAX_MIN,
+  REFRESH_MIN_MIN,
+} from './constants.js';
+
+// A Visual Crossing key is 25 letters and digits; a little slack is left,
+// but never a space, a control byte or a URL character.
+const KEY = /^[A-Za-z0-9]{16,64}$/;
+
+function integer(value, { min, max, fallback }) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const n = typeof value === 'number' ? value : Number(String(value).trim());
+  if (!Number.isFinite(n) || !Number.isInteger(n)) return undefined;
+  if (n < min || n > max) return undefined;
+  return n;
+}
 
 /**
- * Merge the user config with the defaults.
- * @param {Record<string, unknown>} raw config returned by the SDK
+ * Returns `{ configured, errors, value }`. `configured` is false while the key
+ * is empty (fresh install); `errors` lists the invalid keys.
  */
 export function normalizeConfig(raw = {}) {
+  const config = raw && typeof raw === 'object' ? raw : {};
+  const errors = [];
+  const apiKey = typeof config.api_key === 'string' ? config.api_key.trim() : '';
+  const configured = apiKey !== '';
+  if (!KEY.test(apiKey)) errors.push('api_key');
+
+  const alerts = config.alerts === undefined || config.alerts === null ? true : config.alerts;
+  if (typeof alerts !== 'boolean') errors.push('alerts');
+
+  const refreshMinutes = integer(config.refresh_minutes, {
+    min: REFRESH_MIN_MIN,
+    max: REFRESH_MAX_MIN,
+    fallback: REFRESH_DEFAULT_MIN,
+  });
+  if (refreshMinutes === undefined) errors.push('refresh_minutes');
+  const dailyBudget = integer(config.daily_budget, {
+    min: BUDGET_MIN,
+    max: BUDGET_MAX,
+    fallback: BUDGET_DEFAULT,
+  });
+  if (dailyBudget === undefined) errors.push('daily_budget');
+
+  if (errors.length > 0) return { configured, errors, value: null };
   return {
-    ...DEFAULT_CONFIG,
-    ...raw,
-    // Force the types: config may arrive as strings from a form.
-    latitude: Number(raw.latitude ?? DEFAULT_CONFIG.latitude),
-    longitude: Number(raw.longitude ?? DEFAULT_CONFIG.longitude),
-    poll_frequency: Number(raw.poll_frequency ?? DEFAULT_CONFIG.poll_frequency),
-    // The preference is a boolean; anything but an explicit false means true.
-    GLADYS_PREFER_LOCAL: raw.GLADYS_PREFER_LOCAL !== false,
+    configured,
+    errors,
+    value: {
+      apiKey,
+      // Identifies the key (salted again in app.js): a refused key is never
+      // sent again on its own, a new one always is.
+      keyId: createHash('sha256').update(`visual-crossing\n${apiKey}`).digest('hex'),
+      alerts,
+      refreshMs: refreshMinutes * 60_000,
+      dailyBudget,
+    },
   };
 }

@@ -1,177 +1,108 @@
 {
   "manifest_version": 1,
-  "type": "device",
-  "name": "Demo Devices Template",
+  "type": "weather",
+  "name": "Visual Crossing",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Unofficial connector: Visual Crossing weather, 15-day forecasts and alerts, with your API key.",
+    "fr": "Non officiel : météo, prévisions à 15 jours et alertes Visual Crossing, avec votre clé API."
   },
-  "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "version": "0.1.0",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-visual-crossing:0.1.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-visual-crossing/main/cover.png",
+  "categories": ["environment"],
+  "transports": ["cloud"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": { "en": "Visual Crossing in Gladys", "fr": "Visual Crossing dans Gladys" },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "Unofficial connector, not affiliated with Visual Crossing. It makes Visual Crossing the weather provider of Gladys: current conditions, 24 hours, 8 days and the alerts given for your area. It needs your own Visual Crossing account and API key. The free plan includes 1,000 records a day; a forecast costs 1 record. On the pay-as-you-go plan, records beyond the free ones are billed by Visual Crossing (0.0001 USD each at the time of writing): the daily cap below stops the calls first. Each location is read at most once per refresh interval (one hour by default). Weather data provided by Visual Crossing.",
+        "fr": "Connecteur non officiel, sans lien avec Visual Crossing. Il fait de Visual Crossing le fournisseur météo de Gladys : conditions actuelles, 24 heures, 8 jours et les alertes données pour votre zone. Il faut votre propre compte Visual Crossing et sa clé API. L'offre gratuite inclut 1 000 enregistrements par jour ; une prévision coûte 1 enregistrement. Avec l'offre à l'usage, les enregistrements au-delà des gratuits sont facturés par Visual Crossing (0,0001 USD pièce au moment de l'écriture) : le plafond quotidien ci-dessous arrête les appels avant. Chaque lieu est lu au plus une fois par intervalle (une heure par défaut). Données météo fournies par Visual Crossing."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://www.visualcrossing.com/sign-up",
+          "label": {
+            "en": "Create a Visual Crossing account",
+            "fr": "Créer un compte Visual Crossing"
+          }
+        },
+        {
+          "url": "https://www.visualcrossing.com/weather-data-editions",
+          "label": {
+            "en": "Visual Crossing plans and prices",
+            "fr": "Offres et prix de Visual Crossing"
+          }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-visual-crossing/blob/main/docs/fr.md",
+          "label": { "en": "Guide (French)", "fr": "Guide (français)" }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-visual-crossing/blob/main/docs/en.md",
+          "label": { "en": "Guide (English)", "fr": "Guide (anglais)" }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
+      "key": "api_key",
+      "type": "secret",
+      "label": { "en": "API key", "fr": "Clé API" },
       "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
+        "en": "The key of your Visual Crossing account (Account page). Kept by Gladys in its database, never shown again, sent only to Visual Crossing.",
+        "fr": "La clé de votre compte Visual Crossing (page Account). Gardée par Gladys dans sa base, jamais réaffichée, envoyée seulement à Visual Crossing."
       },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
+      "required": true
     },
     {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
+      "key": "alerts",
+      "type": "boolean",
+      "label": { "en": "Weather alerts", "fr": "Alertes météo" },
       "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
+        "en": "Asks Visual Crossing for the active alerts of the location (same cost), shown by the weather widget and used by the weather-alert scene triggers of Gladys.",
+        "fr": "Demande à Visual Crossing les alertes en cours du lieu (même coût), affichées par le widget météo et utilisées par les déclencheurs de scène d'alerte météo de Gladys."
       },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
+      "required": false,
+      "default": true
+    },
+    {
+      "key": "refresh_minutes",
+      "type": "number",
+      "label": { "en": "Refresh interval (minutes)", "fr": "Intervalle de lecture (minutes)" },
+      "description": {
+        "en": "A location is read from Visual Crossing at most once per interval; Gladys gets the kept copy in between. 60 minutes is at most 24 records a day per location.",
+        "fr": "Un lieu est lu chez Visual Crossing au plus une fois par intervalle ; Gladys reçoit la copie gardée entre-temps. 60 minutes font au plus 24 enregistrements par jour et par lieu."
+      },
+      "required": false,
+      "default": 60,
+      "min": 60,
       "max": 180
     },
     {
-      "key": "unit",
-      "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
-      "required": false,
-      "default": "celsius",
-      "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
-      ]
-    },
-    {
-      "key": "poll_frequency",
+      "key": "daily_budget",
       "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "label": { "en": "Daily cap (records)", "fr": "Plafond quotidien (enregistrements)" },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "Records allowed per day (UTC), counted by this integration before each call and kept across restarts. Reached: no call until midnight UTC. Visual Crossing counts the records of all your uses of the key in the same account.",
+        "fr": "Enregistrements permis par jour (UTC), comptés par cette intégration avant chaque appel et gardés au redémarrage. Atteint : aucun appel avant minuit UTC. Visual Crossing compte tous les usages de la clé dans le même compte."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": 500,
+      "min": 10,
+      "max": 100000
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
-    }
-  ],
-  "scene_triggers": [
-    {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "test_connection",
+      "timeout_seconds": 30,
+      "label": { "en": "Test Visual Crossing", "fr": "Tester Visual Crossing" },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
-      },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
-        },
-        {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
-          ]
-        }
-      ],
-      "variables": [
-        {
-          "key": "target",
-          "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
-        }
-      ]
-    }
-  ],
-  "scene_actions": [
-    {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
-      },
-      "timeout_seconds": 15,
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ],
-      "outputs": [
-        {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
-        }
-      ]
-    }
-  ],
-  "widgets": [
-    {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
-      },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+        "en": "One call to Visual Crossing with this key (current conditions at Greenwich, 1 record): says whether it is accepted, and the records counted today.",
+        "fr": "Un appel à Visual Crossing avec cette clé (conditions actuelles à Greenwich, 1 enregistrement) : indique si elle est acceptée et les enregistrements comptés aujourd'hui."
+      }
     }
   ]
 }
