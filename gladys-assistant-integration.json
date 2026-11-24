@@ -6,8 +6,8 @@
     "en": "Unofficial connector: Visual Crossing weather, 15-day forecasts and alerts, with your API key.",
     "fr": "Non officiel : météo, prévisions à 15 jours et alertes Visual Crossing, avec votre clé API."
   },
-  "version": "0.1.1",
-  "docker_image": "ghcr.io/lm1lc3n7/gladys-visual-crossing:0.1.1",
+  "version": "0.1.2",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-visual-crossing:0.1.2",
   "gladys_version": ">=5.1.0",
   "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-visual-crossing/main/cover.png",
   "categories": ["environment"],

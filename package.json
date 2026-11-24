@@ -1,6 +1,6 @@
 {
   "name": "gladys-visual-crossing",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Visual Crossing weather provider for Gladys Assistant: current conditions, hourly and daily forecasts, alerts, with the user own API key.",
   "type": "module",

@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-24
+
 ### Fixed
 
 - The User-Agent gives the real version (it said 0.1.0 whatever the release).
@@ -30,5 +32,6 @@ the notes of the version's GitHub Release.
 - A key refused (HTTP 401) is no longer sent; "Test Visual Crossing" checks
   it and lifts the refusal.
 
-[Unreleased]: https://github.com/LM1LC3N7/gladys-visual-crossing/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/LM1LC3N7/gladys-visual-crossing/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/LM1LC3N7/gladys-visual-crossing/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/LM1LC3N7/gladys-visual-crossing/releases/tag/v0.1.1
