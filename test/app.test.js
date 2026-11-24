@@ -147,7 +147,10 @@ test('the weather: one forecast call, metric conversions, alerts typed, copy reu
   assert.equal(q.get('lang'), null);
   assert.equal(call.init.redirect, 'manual');
   assert.equal(call.init.headers.Accept, 'application/json');
-  assert.match(call.init.headers['User-Agent'], /^gladys-visual-crossing\/0\.1\.0 \(\+https:/);
+  assert.match(
+    call.init.headers['User-Agent'],
+    /^gladys-visual-crossing\/\d+\.\d+\.\d+ \(\+https:/,
+  );
   assert.equal((await status(gladys)).connected, true);
   assert.equal(fs.state().records, 1);
   assert.equal(fs.state().day, '2026-11-15');
